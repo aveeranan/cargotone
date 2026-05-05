@@ -35,7 +35,7 @@ async def agents_list(request: Request, user: dict = Depends(require_admin)):
     })
 
 
-COMPANY_DOMAIN = "cargotone.com"
+COMPANY_DOMAIN = "cargotonelogistics.com"
 
 
 @router.post("/api/agents")

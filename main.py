@@ -62,12 +62,12 @@ async def startup():
     if not users_store.get_all():
         users_store.create(
             name="Admin",
-            email="admin@cargotone.com",
+            email="admin@cargotonelogistics.com",
             password_hash=auth_module.hash_password("Admin@123!"),
             role="admin",
         )
         print("\n✓ Default admin created:")
-        print("  Email   : admin@cargotone.com")
+        print("  Email   : admin@cargotonelogistics.com")
         print("  Password: Admin@123!")
         print("  ⚠  Change this password after first login!\n")
 

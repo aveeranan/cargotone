@@ -11,7 +11,7 @@ def get_all() -> list:
 
 
 def get_active_agents() -> list:
-    return [u for u in get_all() if u.get("isActive") and u.get("role") == "agent"]
+    return [u for u in get_all() if u.get("isActive", True) and u.get("role") == "agent"]
 
 
 def get_by_id(user_id: str) -> Optional[dict]:

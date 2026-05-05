@@ -231,7 +231,7 @@ On first startup the app automatically creates the `data/` directory, initialise
 
 | Field | Value |
 |---|---|
-| Email | `admin@cargotone.com` |
+| Email | `admin@cargotonelogistics.com` |
 | Password | `Admin@123!` |
 
 > **Change this password immediately after first login.**
