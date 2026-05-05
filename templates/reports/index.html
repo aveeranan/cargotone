@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}Reports — CargoTone{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+<ul class="nav nav-tabs mb-4" id="reportTabs">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-daily" onclick="loadDaily()">Daily</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-weekly" onclick="loadWeekly()">Weekly</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-trends" onclick="loadTrends()">Trends</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-company">Company</button></li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- Daily -->
+  <div class="tab-pane fade show active" id="tab-daily">
+    <div class="form-card mb-3">
+      <div class="d-flex gap-3 align-items-end">
+        <div>
+          <label class="form-label fw-semibold">Date</label>
+          <input type="date" id="daily-date" class="form-control form-control-sm" value="{{ '' }}">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="loadDaily()">Load</button>
+      </div>
+    </div>
+    <div id="daily-content"><div class="text-center py-4 text-muted">Select a date and click Load</div></div>
+    <div class="row g-4 mt-2">
+      <div class="col-lg-8">
+        <div class="form-card">
+          <h6 class="fw-bold mb-3">Last 56 Days — Calls per Agent</h6>
+          <canvas id="daily-agent-chart"></canvas>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="form-card">
+          <h6 class="fw-bold mb-3">Last 56 Days — Company Total</h6>
+          <canvas id="daily-total-chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Weekly -->
+  <div class="tab-pane fade" id="tab-weekly">
+    <div class="form-card mb-3">
+      <div class="d-flex gap-3 align-items-end">
+        <div>
+          <label class="form-label fw-semibold">Week starting (Monday)</label>
+          <input type="date" id="weekly-date" class="form-control form-control-sm">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="loadWeekly()">Load</button>
+      </div>
+    </div>
+    <div id="weekly-content"><div class="text-center py-4 text-muted">Select a week and click Load</div></div>
+    <div class="row g-4 mt-2">
+      <div class="col-lg-8">
+        <div class="form-card">
+          <h6 class="fw-bold mb-3">Last 8 Weeks — Calls per Agent</h6>
+          <canvas id="weekly-agent-chart"></canvas>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="form-card">
+          <h6 class="fw-bold mb-3">Last 8 Weeks — Company Total</h6>
+          <canvas id="weekly-total-chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trends -->
+  <div class="tab-pane fade" id="tab-trends">
+    <div id="trends-content">
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="form-card">
+            <h6 class="fw-bold mb-3">Weekly Call Volume (last 8 weeks)</h6>
+            <canvas id="weeklyChart" height="220"></canvas>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-card">
+            <h6 class="fw-bold mb-3">Monthly Call Volume (last 6 months)</h6>
+            <canvas id="monthlyChart" height="220"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Company -->
+  <div class="tab-pane fade" id="tab-company">
+    <div class="form-card mb-3">
+      <div class="d-flex gap-3 align-items-end">
+        <div class="flex-grow-1">
+          <label class="form-label fw-semibold">Company ID</label>
+          <input type="text" id="co-id-input" class="form-control form-control-sm" placeholder="Paste company ID…">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="loadCompanyReport()">Load</button>
+      </div>
+    </div>
+    <div id="company-report-content"><div class="text-center py-4 text-muted">Enter a company ID to view its full report</div></div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Set today as default
+document.getElementById('daily-date').value = new Date().toISOString().slice(0,10);
+const today = new Date();
+const monday = new Date(today);
+monday.setDate(today.getDate() - today.getDay() + 1);
+document.getElementById('weekly-date').value = monday.toISOString().slice(0,10);
+
+const OUTCOME_GROUPS = {
+  'Positive':    ['ORDER','CLOSURE','CONTRACT_YEARLY','CONTRACT_QUATERLY','CONTRACT_MNC'],
+  'Engaged':     ['APPOINTMENT','NE_NEGOTIATION','ES_ENQUIRY_SHARED','PS_PROFILE_SENT','EE_EXISTING_CLIENT',
+                  'NC_NO_CLEAR_FEEDBACK','CM_CALL_ME_LATER','SOEF_SUPPORT_ONLY_EXISTING_FFF','reached','callback'],
+  'Not Reached': ['NA_NOT_ANSWER','NE_NUMBER_NOT_EXIST','CD_CALL_DISCONNECT','NN_NO_NUMBER','NW_NO_WEBSITE',
+                  'BUSY','RR_RECEPTION_REJECTION','SR_SECURITY_REJECTION'],
+  'Rejected':    ['NI_NOT_INTERESTED','PERMANENTLY_CLOSED','FRADULENT','PAYMENT_ISSUE','MANAGEMENT_DECISION_IS_FINAL'],
+};
+const GROUP_LABELS = ['Positive', 'Engaged', 'Not Reached', 'Rejected', 'Other'];
+
+async function loadDaily() {
+  const date = document.getElementById('daily-date').value;
+  if (!date) return;
+  const data = await fetch(`/api/reports/daily?date=${date}`).then(r => r.json());
+  const agents = data.agents;
+  if (!agents.length) {
+    document.getElementById('daily-content').innerHTML = '<div class="text-center text-muted py-4">No data for this date</div>';
+    return;
+  }
+
+  let rows = agents.map(a => {
+    const counts = {};
+    Object.entries(a.outcomes).forEach(([o, n]) => {
+      let placed = false;
+      for (const [g, codes] of Object.entries(OUTCOME_GROUPS)) {
+        if (codes.includes(o)) { counts[g] = (counts[g] || 0) + n; placed = true; break; }
+      }
+      if (!placed) counts['Other'] = (counts['Other'] || 0) + n;
+    });
+    const cells = GROUP_LABELS.map(g => `<td class="text-center">${counts[g] || 0}</td>`).join('');
+    return `<tr><td class="fw-semibold">${a.agentName}</td><td class="fw-bold text-center">${a.total}</td>${cells}</tr>`;
+  }).join('');
+
+  const headers = GROUP_LABELS.map(g => `<th class="text-center" style="font-size:.72rem">${g}</th>`).join('');
+  document.getElementById('daily-content').innerHTML = `
+    <div class="table-card" style="overflow-x:auto">
+      <table class="table" style="font-size:.85rem">
+        <thead><tr>
+          <th>Agent</th><th class="text-center">Total</th>${headers}
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+async function loadWeekly() {
+  const ws = document.getElementById('weekly-date').value;
+  if (!ws) return;
+  const data = await fetch(`/api/reports/weekly?weekStart=${ws}`).then(r => r.json());
+  const agents = data.agents;
+  if (!agents.length) {
+    document.getElementById('weekly-content').innerHTML = '<div class="text-center text-muted py-4">No data for this week</div>';
+    return;
+  }
+  // Build chart
+  document.getElementById('weekly-content').innerHTML = `
+    <div class="form-card mb-3"><canvas id="weeklyAgentChart" height="120"></canvas></div>
+    <div class="table-card">
+      <table class="table">
+        <thead><tr><th>Agent</th><th class="text-center">Total Calls This Week</th></tr></thead>
+        <tbody>${agents.map(a => `<tr><td>${a.agentName}</td><td class="text-center fw-bold">${a.total}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+  new Chart(document.getElementById('weeklyAgentChart'), {
+    type: 'bar',
+    data: {
+      labels: agents.map(a => a.agentName),
+      datasets: [{ label: 'Calls', data: agents.map(a => a.total), backgroundColor: '#3b82f6', borderRadius: 6 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+}
+
+let trendsLoaded = false;
+async function loadTrends() {
+  if (trendsLoaded) return;
+  trendsLoaded = true;
+  const data = await fetch('/api/reports/trends').then(r => r.json());
+  new Chart(document.getElementById('weeklyChart'), {
+    type: 'line',
+    data: {
+      labels: data.weekly.map(w => w.week),
+      datasets: [{ label: 'Calls', data: data.weekly.map(w => w.total), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .3 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+  new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+      labels: data.monthly.map(m => m.label),
+      datasets: [{ label: 'Calls', data: data.monthly.map(m => m.total), backgroundColor: '#10b981', borderRadius: 6 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+async function loadCompanyReport() {
+  const id = document.getElementById('co-id-input').value.trim();
+  if (!id) return;
+  const data = await fetch(`/api/reports/company/${id}`).then(r => r.json());
+  if (data.error) { document.getElementById('company-report-content').innerHTML = `<div class="alert alert-danger">${data.error}</div>`; return; }
+  const { company, callLogs, agentHistory } = data;
+  const logRows = callLogs.map(l => `<tr><td>${l.callDate?.slice(0,10)}</td><td>${l.agentName}</td><td>${l.outcome.replace('_',' ')}</td><td>${l.notes || '—'}</td><td>${l.followUpDate || '—'}</td></tr>`).join('');
+  const histRows = agentHistory.map(h => `<tr><td>${h.agentName}</td><td>${h.startDate?.slice(0,10)}</td><td>${h.endDate?.slice(0,10) || 'Current'}</td><td>${h.reason}</td></tr>`).join('');
+  document.getElementById('company-report-content').innerHTML = `
+    <div class="form-card mb-3">
+      <h6 class="fw-bold">${company.name}</h6>
+      <div class="text-muted">${[company.address1, company.address2, company.country].filter(Boolean).join(', ')} · ${company.goodsTypes?.join(', ') || ''}</div>
+    </div>
+    <h6 class="fw-semibold mb-2">Call History (${callLogs.length} calls)</h6>
+    <div class="table-card mb-3">
+      <table class="table"><thead><tr><th>Date</th><th>Agent</th><th>Outcome</th><th>Notes</th><th>Follow-up</th></tr></thead>
+      <tbody>${logRows || '<tr><td colspan=5 class="text-muted text-center">No calls</td></tr>'}</tbody></table>
+    </div>
+    <h6 class="fw-semibold mb-2">Agent Assignment History</h6>
+    <div class="table-card">
+      <table class="table"><thead><tr><th>Agent</th><th>From</th><th>To</th><th>Reason</th></tr></thead>
+      <tbody>${histRows || '<tr><td colspan=4 class="text-muted text-center">No history</td></tr>'}</tbody></table>
+    </div>`;
+}
+
+const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
+
+function renderTrendCharts(labels, agents, totals, agentCanvasId, totalCanvasId, pointRadius) {
+  new Chart(document.getElementById(agentCanvasId), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: agents.map((a, i) => ({
+        label: a.agentName,
+        data: a.data,
+        borderColor: CHART_COLORS[i % CHART_COLORS.length],
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        pointRadius,
+      }))
+    },
+    options: {
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+  new Chart(document.getElementById(totalCanvasId), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label: 'Total', data: totals, borderColor: '#1d4ed8', backgroundColor: 'rgba(29,78,216,.08)', fill: true, tension: 0.3, pointRadius }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+}
+
+let _dailyTrendsLoaded = false;
+async function initDailyTrendCharts() {
+  if (_dailyTrendsLoaded) return;
+  _dailyTrendsLoaded = true;
+  const d = await fetch('/api/reports/daily-trends').then(r => r.json());
+  renderTrendCharts(d.dayLabels, d.agents, d.totals, 'daily-agent-chart', 'daily-total-chart', 2);
+}
+
+let _weeklyTrendsLoaded = false;
+async function initWeeklyTrendCharts() {
+  if (_weeklyTrendsLoaded) return;
+  _weeklyTrendsLoaded = true;
+  const d = await fetch('/api/reports/agent-trends').then(r => r.json());
+  renderTrendCharts(d.weekLabels, d.agents, d.totals, 'weekly-agent-chart', 'weekly-total-chart', 4);
+}
+
+// Load trends when tab is clicked
+document.querySelector('[data-bs-target="#tab-trends"]').addEventListener('shown.bs.tab', loadTrends);
+document.querySelector('[data-bs-target="#tab-weekly"]').addEventListener('shown.bs.tab', initWeeklyTrendCharts);
+// Auto load daily on page load
+loadDaily();
+initDailyTrendCharts();
+</script>
+{% endblock %}

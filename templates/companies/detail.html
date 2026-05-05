@@ -1,0 +1,955 @@
+{% extends "base.html" %}
+{% block title %}{{ company.name }} — CargoTone{% endblock %}
+{% block page_title %}
+  <a href="/companies" class="text-muted text-decoration-none" style="font-size:.85rem">Companies</a>
+  <i class="fas fa-chevron-right mx-2" style="font-size:.7rem;color:#94a3b8"></i>{{ company.name }}
+{% endblock %}
+
+{% block content %}
+<!-- Company Header Card -->
+<div class="form-card mb-4">
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+    <div>
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <h4 class="mb-0 fw-bold" id="co-name">{{ company.name }}</h4>
+        <span class="badge-status s-{{ company.status | status_css }}" id="status-badge">{{ company.status | status_label }}</span>
+      </div>
+      <div class="text-muted mt-1" style="font-size:.85rem">
+        Assigned to: <strong>{{ agent_name }}</strong>
+        {% if company.website %} · <a href="{{ company.website }}" target="_blank">{{ company.website }}</a>{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editModal">
+        <i class="fas fa-pen me-1"></i>Edit
+      </button>
+      <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#callModal">
+        <i class="fas fa-phone me-1"></i>Log Call
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3" id="coTabs">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview">Overview</button></li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-contacts">
+      Contacts <span class="badge bg-secondary ms-1">{{ contacts | length }}</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-calls">
+      Call History <span class="badge bg-secondary ms-1" id="calls-count">{{ call_logs | length }}</span>
+    </button>
+  </li>
+  {% if user.role == 'admin' %}
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-history">Agent History</button></li>
+  {% endif %}
+</ul>
+
+<div class="tab-content">
+
+  <!-- Overview -->
+  <div class="tab-pane fade show active" id="tab-overview">
+    <div class="form-card">
+      <div class="row g-3">
+        <!-- Keys row -->
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Company Key <i class="fas fa-circle-info text-muted ms-1" title="Unique identifier auto-generated for this company" style="font-size:.8rem"></i></label>
+          <p class="mb-0">
+            <code style="font-size:.9rem;color:#1d4ed8;background:#eff6ff;padding:3px 8px;border-radius:6px">{{ company.companyKey or '—' }}</code>
+          </p>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">
+            Super Company Key
+            <i class="fas fa-circle-info text-muted ms-1" style="font-size:.8rem"
+               title="Set this to another company's key to mark them as related / same group"></i>
+          </label>
+          <div class="d-flex align-items-center gap-2">
+            {% if company.superCompanyKey and company.superCompanyKey != company.companyKey %}
+              <code id="sckey-display" style="font-size:.9rem;color:#7c3aed;background:#f5f3ff;padding:3px 8px;border-radius:6px;font-weight:600">{{ company.superCompanyKey }}</code>
+              <span class="badge bg-warning text-dark" style="font-size:.7rem">linked</span>
+            {% else %}
+              <code id="sckey-display" style="font-size:.9rem;color:#64748b;background:#f1f5f9;padding:3px 8px;border-radius:6px">{{ company.superCompanyKey or company.companyKey }}</code>
+              <span class="badge bg-light text-muted border" style="font-size:.7rem">default</span>
+            {% endif %}
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="editSuperKey()" title="Change super company key">
+              <i class="fas fa-pen" style="font-size:.7rem"></i>
+            </button>
+          </div>
+          <!-- Inline edit for super key -->
+          <div id="sckey-edit" class="d-none mt-2">
+            <div class="input-group input-group-sm">
+              <input type="text" id="sckey-input" class="form-control" style="font-family:monospace"
+                     placeholder="e.g. ACME-1234"
+                     value="{{ company.superCompanyKey or company.companyKey }}">
+              <button class="btn btn-success" onclick="saveSuperKey()">Save</button>
+              <button class="btn btn-outline-secondary" onclick="cancelSuperKey()">Cancel</button>
+            </div>
+            <div class="form-text">Enter another company's key to link them as the same group. Leave as current key to unlink.</div>
+          </div>
+        </div>
+
+        <div class="col-12"><hr class="my-1"></div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Company Name</label>
+          <p class="mb-0">{{ company.name }}</p>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Sales Agent</label>
+          <p class="mb-0">{{ agent_name }}</p>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Status</label>
+          <p class="mb-0"><span class="badge-status s-{{ company.status | status_css }}">{{ company.status | status_label }}</span></p>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Call Status</label>
+          <p class="mb-0">{{ company.callStatus or '—' }}</p>
+        </div>
+
+        <div class="col-12"><hr class="my-1"></div>
+
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Address 1</label>
+          <p class="mb-0">{{ company.address1 or '—' }}</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Address 2</label>
+          <p class="mb-0">{{ company.address2 or '—' }}</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Country</label>
+          <p class="mb-0">{{ company.country or '—' }}</p>
+        </div>
+
+        <div class="col-12"><hr class="my-1"></div>
+
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Business Type</label>
+          <p class="mb-0">{{ company.businessType or '—' }}</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Shipment Mode</label>
+          <p class="mb-0">{{ company.mode or '—' }}</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Shipment Type</label>
+          <p class="mb-0">{{ company.shipmentType or '—' }}</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Website</label>
+          <p class="mb-0">{{ company.website or '—' }}</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Goods / Products</label>
+          <p class="mb-0">{{ company.goodsTypes | join(', ') or '—' }}</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Remarks</label>
+          <p class="mb-0">{{ company.remarks or '—' }}</p>
+        </div>
+
+        <div class="col-12"><hr class="my-1"></div>
+
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Air Import Volume</label>
+          <p class="mb-0">{{ company.airImportVolume or '—' }}</p>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Air Export Volume</label>
+          <p class="mb-0">{{ company.airExportVolume or '—' }}</p>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Ocean Import Volume</label>
+          <p class="mb-0">{{ company.oceanImportVolume or '—' }}</p>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Ocean Export Volume</label>
+          <p class="mb-0">{{ company.oceanExportVolume or '—' }}</p>
+        </div>
+
+        <div class="col-12"><hr class="my-1"></div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Added</label>
+          <p class="mb-0">{{ company.createdAt | fmt_date }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contacts -->
+  <div class="tab-pane fade" id="tab-contacts">
+    <div class="d-flex justify-content-end mb-2">
+      <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#contactModal">
+        <i class="fas fa-plus me-1"></i>Add Contact
+      </button>
+    </div>
+    <div id="contacts-list">
+      {% if contacts %}
+      <div class="table-card">
+        <table class="table">
+          <thead><tr><th>Name</th><th>Designation</th><th>Email</th><th>Phone(s)</th><th>Primary</th><th></th></tr></thead>
+          <tbody>
+            {% for ct in contacts %}
+            <tr id="ct-{{ ct.id }}">
+              <td class="fw-semibold">{{ ct.name }}</td>
+              <td>{{ ct.designation or '—' }}</td>
+              <td>{{ ct.email or '—' }}</td>
+              <td>{{ ct.phones | join(', ') if ct.phones else '—' }}</td>
+              <td>{% if ct.isPrimary %}<i class="fas fa-star text-warning"></i>{% endif %}</td>
+              <td>
+                <button class="btn btn-sm btn-outline-secondary py-0" onclick="editContact('{{ ct.id }}')">Edit</button>
+                <button class="btn btn-sm btn-outline-danger py-0" onclick="delContact('{{ ct.id }}')">Del</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">No contacts added yet</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Call History -->
+  <div class="tab-pane fade" id="tab-calls">
+    <div id="call-timeline">
+      {% if call_logs %}
+      <div class="timeline">
+        {% for log in call_logs %}
+        <div class="tl-item">
+          <div class="tl-date">{{ log.callDate | fmt_datetime }} · {{ log.agentName }}</div>
+          <div class="tl-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <span class="tl-outcome">
+                <i class="fas fa-phone me-1"></i>
+                {{ log.outcome }}
+              </span>
+              {% if log.followUpDate %}
+              <span class="badge bg-light text-dark" style="font-size:.72rem">
+                <i class="fas fa-calendar me-1"></i>Follow-up: {{ log.followUpDate }}
+              </span>
+              {% endif %}
+            </div>
+            {% if log.notes %}<div class="tl-note mt-2">{{ log.notes }}</div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">No calls logged yet</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Agent History (admin) -->
+  {% if user.role == 'admin' %}
+  <div class="tab-pane fade" id="tab-history">
+    {% if agent_history %}
+    <div class="table-card">
+      <table class="table">
+        <thead><tr><th>Agent</th><th>From</th><th>To</th><th>Reason</th></tr></thead>
+        <tbody>
+          {% for h in agent_history %}
+          <tr>
+            <td>{{ h.agentName }}</td>
+            <td>{{ h.startDate | fmt_date }}</td>
+            <td>{{ h.endDate | fmt_date if h.endDate else 'Current' }}</td>
+            <td>{{ h.reason | replace('_',' ') | title }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-4">No assignment history</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Edit Company Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title fw-bold">Edit Company</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Company Name</label>
+            <input type="text" id="e-name" class="form-control" value="{{ company.name }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Status</label>
+            <select id="e-status" class="form-select">
+              {% for s in statuses %}
+              <option value="{{ s }}" {{ 'selected' if company.status == s else '' }}>{{ s | status_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Call Status</label>
+            <input type="text" id="e-callstatus" class="form-control" value="{{ company.callStatus or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Website</label>
+            <input type="text" id="e-website" class="form-control" value="{{ company.website or '' }}">
+          </div>
+
+          <div class="col-12"><hr class="my-0"></div>
+
+          <div class="col-md-4">
+            <label class="form-label">Address 1</label>
+            <input type="text" id="e-address1" class="form-control" value="{{ company.address1 or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Address 2</label>
+            <input type="text" id="e-address2" class="form-control" value="{{ company.address2 or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Country</label>
+            <select id="e-country" class="form-select">
+              <option value="">— Select —</option>
+              <option value="AD" {{ 'selected' if company.country == 'AD' else '' }}>AD - Andorra</option>
+              <option value="AE" {{ 'selected' if company.country == 'AE' else '' }}>AE - United Arab Emirates</option>
+              <option value="AF" {{ 'selected' if company.country == 'AF' else '' }}>AF - Afghanistan</option>
+              <option value="AG" {{ 'selected' if company.country == 'AG' else '' }}>AG - Antigua and Barbuda</option>
+              <option value="AI" {{ 'selected' if company.country == 'AI' else '' }}>AI - Anguilla</option>
+              <option value="AL" {{ 'selected' if company.country == 'AL' else '' }}>AL - Albania</option>
+              <option value="AM" {{ 'selected' if company.country == 'AM' else '' }}>AM - Armenia</option>
+              <option value="AO" {{ 'selected' if company.country == 'AO' else '' }}>AO - Angola</option>
+              <option value="AQ" {{ 'selected' if company.country == 'AQ' else '' }}>AQ - Antarctica</option>
+              <option value="AR" {{ 'selected' if company.country == 'AR' else '' }}>AR - Argentina</option>
+              <option value="AS" {{ 'selected' if company.country == 'AS' else '' }}>AS - American Samoa</option>
+              <option value="AT" {{ 'selected' if company.country == 'AT' else '' }}>AT - Austria</option>
+              <option value="AU" {{ 'selected' if company.country == 'AU' else '' }}>AU - Australia</option>
+              <option value="AW" {{ 'selected' if company.country == 'AW' else '' }}>AW - Aruba</option>
+              <option value="AX" {{ 'selected' if company.country == 'AX' else '' }}>AX - Åland Islands</option>
+              <option value="AZ" {{ 'selected' if company.country == 'AZ' else '' }}>AZ - Azerbaijan</option>
+              <option value="BA" {{ 'selected' if company.country == 'BA' else '' }}>BA - Bosnia and Herzegovina</option>
+              <option value="BB" {{ 'selected' if company.country == 'BB' else '' }}>BB - Barbados</option>
+              <option value="BD" {{ 'selected' if company.country == 'BD' else '' }}>BD - Bangladesh</option>
+              <option value="BE" {{ 'selected' if company.country == 'BE' else '' }}>BE - Belgium</option>
+              <option value="BF" {{ 'selected' if company.country == 'BF' else '' }}>BF - Burkina Faso</option>
+              <option value="BG" {{ 'selected' if company.country == 'BG' else '' }}>BG - Bulgaria</option>
+              <option value="BH" {{ 'selected' if company.country == 'BH' else '' }}>BH - Bahrain</option>
+              <option value="BI" {{ 'selected' if company.country == 'BI' else '' }}>BI - Burundi</option>
+              <option value="BJ" {{ 'selected' if company.country == 'BJ' else '' }}>BJ - Benin</option>
+              <option value="BL" {{ 'selected' if company.country == 'BL' else '' }}>BL - Saint Barthélemy</option>
+              <option value="BM" {{ 'selected' if company.country == 'BM' else '' }}>BM - Bermuda</option>
+              <option value="BN" {{ 'selected' if company.country == 'BN' else '' }}>BN - Brunei Darussalam</option>
+              <option value="BO" {{ 'selected' if company.country == 'BO' else '' }}>BO - Bolivia</option>
+              <option value="BQ" {{ 'selected' if company.country == 'BQ' else '' }}>BQ - Bonaire, Sint Eustatius and Saba</option>
+              <option value="BR" {{ 'selected' if company.country == 'BR' else '' }}>BR - Brazil</option>
+              <option value="BS" {{ 'selected' if company.country == 'BS' else '' }}>BS - Bahamas</option>
+              <option value="BT" {{ 'selected' if company.country == 'BT' else '' }}>BT - Bhutan</option>
+              <option value="BV" {{ 'selected' if company.country == 'BV' else '' }}>BV - Bouvet Island</option>
+              <option value="BW" {{ 'selected' if company.country == 'BW' else '' }}>BW - Botswana</option>
+              <option value="BY" {{ 'selected' if company.country == 'BY' else '' }}>BY - Belarus</option>
+              <option value="BZ" {{ 'selected' if company.country == 'BZ' else '' }}>BZ - Belize</option>
+              <option value="CA" {{ 'selected' if company.country == 'CA' else '' }}>CA - Canada</option>
+              <option value="CC" {{ 'selected' if company.country == 'CC' else '' }}>CC - Cocos (Keeling) Islands</option>
+              <option value="CD" {{ 'selected' if company.country == 'CD' else '' }}>CD - Congo (Democratic Republic of the)</option>
+              <option value="CF" {{ 'selected' if company.country == 'CF' else '' }}>CF - Central African Republic</option>
+              <option value="CG" {{ 'selected' if company.country == 'CG' else '' }}>CG - Congo</option>
+              <option value="CH" {{ 'selected' if company.country == 'CH' else '' }}>CH - Switzerland</option>
+              <option value="CI" {{ 'selected' if company.country == 'CI' else '' }}>CI - Côte d'Ivoire</option>
+              <option value="CK" {{ 'selected' if company.country == 'CK' else '' }}>CK - Cook Islands</option>
+              <option value="CL" {{ 'selected' if company.country == 'CL' else '' }}>CL - Chile</option>
+              <option value="CM" {{ 'selected' if company.country == 'CM' else '' }}>CM - Cameroon</option>
+              <option value="CN" {{ 'selected' if company.country == 'CN' else '' }}>CN - China</option>
+              <option value="CO" {{ 'selected' if company.country == 'CO' else '' }}>CO - Colombia</option>
+              <option value="CR" {{ 'selected' if company.country == 'CR' else '' }}>CR - Costa Rica</option>
+              <option value="CU" {{ 'selected' if company.country == 'CU' else '' }}>CU - Cuba</option>
+              <option value="CV" {{ 'selected' if company.country == 'CV' else '' }}>CV - Cabo Verde</option>
+              <option value="CW" {{ 'selected' if company.country == 'CW' else '' }}>CW - Curaçao</option>
+              <option value="CX" {{ 'selected' if company.country == 'CX' else '' }}>CX - Christmas Island</option>
+              <option value="CY" {{ 'selected' if company.country == 'CY' else '' }}>CY - Cyprus</option>
+              <option value="CZ" {{ 'selected' if company.country == 'CZ' else '' }}>CZ - Czechia</option>
+              <option value="DE" {{ 'selected' if company.country == 'DE' else '' }}>DE - Germany</option>
+              <option value="DJ" {{ 'selected' if company.country == 'DJ' else '' }}>DJ - Djibouti</option>
+              <option value="DK" {{ 'selected' if company.country == 'DK' else '' }}>DK - Denmark</option>
+              <option value="DM" {{ 'selected' if company.country == 'DM' else '' }}>DM - Dominica</option>
+              <option value="DO" {{ 'selected' if company.country == 'DO' else '' }}>DO - Dominican Republic</option>
+              <option value="DZ" {{ 'selected' if company.country == 'DZ' else '' }}>DZ - Algeria</option>
+              <option value="EC" {{ 'selected' if company.country == 'EC' else '' }}>EC - Ecuador</option>
+              <option value="EE" {{ 'selected' if company.country == 'EE' else '' }}>EE - Estonia</option>
+              <option value="EG" {{ 'selected' if company.country == 'EG' else '' }}>EG - Egypt</option>
+              <option value="EH" {{ 'selected' if company.country == 'EH' else '' }}>EH - Western Sahara</option>
+              <option value="ER" {{ 'selected' if company.country == 'ER' else '' }}>ER - Eritrea</option>
+              <option value="ES" {{ 'selected' if company.country == 'ES' else '' }}>ES - Spain</option>
+              <option value="ET" {{ 'selected' if company.country == 'ET' else '' }}>ET - Ethiopia</option>
+              <option value="FI" {{ 'selected' if company.country == 'FI' else '' }}>FI - Finland</option>
+              <option value="FJ" {{ 'selected' if company.country == 'FJ' else '' }}>FJ - Fiji</option>
+              <option value="FK" {{ 'selected' if company.country == 'FK' else '' }}>FK - Falkland Islands</option>
+              <option value="FM" {{ 'selected' if company.country == 'FM' else '' }}>FM - Micronesia</option>
+              <option value="FO" {{ 'selected' if company.country == 'FO' else '' }}>FO - Faroe Islands</option>
+              <option value="FR" {{ 'selected' if company.country == 'FR' else '' }}>FR - France</option>
+              <option value="GA" {{ 'selected' if company.country == 'GA' else '' }}>GA - Gabon</option>
+              <option value="GB" {{ 'selected' if company.country == 'GB' else '' }}>GB - United Kingdom</option>
+              <option value="GD" {{ 'selected' if company.country == 'GD' else '' }}>GD - Grenada</option>
+              <option value="GE" {{ 'selected' if company.country == 'GE' else '' }}>GE - Georgia</option>
+              <option value="GF" {{ 'selected' if company.country == 'GF' else '' }}>GF - French Guiana</option>
+              <option value="GG" {{ 'selected' if company.country == 'GG' else '' }}>GG - Guernsey</option>
+              <option value="GH" {{ 'selected' if company.country == 'GH' else '' }}>GH - Ghana</option>
+              <option value="GI" {{ 'selected' if company.country == 'GI' else '' }}>GI - Gibraltar</option>
+              <option value="GL" {{ 'selected' if company.country == 'GL' else '' }}>GL - Greenland</option>
+              <option value="GM" {{ 'selected' if company.country == 'GM' else '' }}>GM - Gambia</option>
+              <option value="GN" {{ 'selected' if company.country == 'GN' else '' }}>GN - Guinea</option>
+              <option value="GP" {{ 'selected' if company.country == 'GP' else '' }}>GP - Guadeloupe</option>
+              <option value="GQ" {{ 'selected' if company.country == 'GQ' else '' }}>GQ - Equatorial Guinea</option>
+              <option value="GR" {{ 'selected' if company.country == 'GR' else '' }}>GR - Greece</option>
+              <option value="GS" {{ 'selected' if company.country == 'GS' else '' }}>GS - South Georgia and the South Sandwich Islands</option>
+              <option value="GT" {{ 'selected' if company.country == 'GT' else '' }}>GT - Guatemala</option>
+              <option value="GU" {{ 'selected' if company.country == 'GU' else '' }}>GU - Guam</option>
+              <option value="GW" {{ 'selected' if company.country == 'GW' else '' }}>GW - Guinea-Bissau</option>
+              <option value="GY" {{ 'selected' if company.country == 'GY' else '' }}>GY - Guyana</option>
+              <option value="HK" {{ 'selected' if company.country == 'HK' else '' }}>HK - Hong Kong</option>
+              <option value="HM" {{ 'selected' if company.country == 'HM' else '' }}>HM - Heard Island and McDonald Islands</option>
+              <option value="HN" {{ 'selected' if company.country == 'HN' else '' }}>HN - Honduras</option>
+              <option value="HR" {{ 'selected' if company.country == 'HR' else '' }}>HR - Croatia</option>
+              <option value="HT" {{ 'selected' if company.country == 'HT' else '' }}>HT - Haiti</option>
+              <option value="HU" {{ 'selected' if company.country == 'HU' else '' }}>HU - Hungary</option>
+              <option value="ID" {{ 'selected' if company.country == 'ID' else '' }}>ID - Indonesia</option>
+              <option value="IE" {{ 'selected' if company.country == 'IE' else '' }}>IE - Ireland</option>
+              <option value="IL" {{ 'selected' if company.country == 'IL' else '' }}>IL - Israel</option>
+              <option value="IM" {{ 'selected' if company.country == 'IM' else '' }}>IM - Isle of Man</option>
+              <option value="IN" {{ 'selected' if company.country == 'IN' else '' }}>IN - India</option>
+              <option value="IO" {{ 'selected' if company.country == 'IO' else '' }}>IO - British Indian Ocean Territory</option>
+              <option value="IQ" {{ 'selected' if company.country == 'IQ' else '' }}>IQ - Iraq</option>
+              <option value="IR" {{ 'selected' if company.country == 'IR' else '' }}>IR - Iran</option>
+              <option value="IS" {{ 'selected' if company.country == 'IS' else '' }}>IS - Iceland</option>
+              <option value="IT" {{ 'selected' if company.country == 'IT' else '' }}>IT - Italy</option>
+              <option value="JE" {{ 'selected' if company.country == 'JE' else '' }}>JE - Jersey</option>
+              <option value="JM" {{ 'selected' if company.country == 'JM' else '' }}>JM - Jamaica</option>
+              <option value="JO" {{ 'selected' if company.country == 'JO' else '' }}>JO - Jordan</option>
+              <option value="JP" {{ 'selected' if company.country == 'JP' else '' }}>JP - Japan</option>
+              <option value="KE" {{ 'selected' if company.country == 'KE' else '' }}>KE - Kenya</option>
+              <option value="KG" {{ 'selected' if company.country == 'KG' else '' }}>KG - Kyrgyzstan</option>
+              <option value="KH" {{ 'selected' if company.country == 'KH' else '' }}>KH - Cambodia</option>
+              <option value="KI" {{ 'selected' if company.country == 'KI' else '' }}>KI - Kiribati</option>
+              <option value="KM" {{ 'selected' if company.country == 'KM' else '' }}>KM - Comoros</option>
+              <option value="KN" {{ 'selected' if company.country == 'KN' else '' }}>KN - Saint Kitts and Nevis</option>
+              <option value="KP" {{ 'selected' if company.country == 'KP' else '' }}>KP - North Korea</option>
+              <option value="KR" {{ 'selected' if company.country == 'KR' else '' }}>KR - South Korea</option>
+              <option value="KW" {{ 'selected' if company.country == 'KW' else '' }}>KW - Kuwait</option>
+              <option value="KY" {{ 'selected' if company.country == 'KY' else '' }}>KY - Cayman Islands</option>
+              <option value="KZ" {{ 'selected' if company.country == 'KZ' else '' }}>KZ - Kazakhstan</option>
+              <option value="LA" {{ 'selected' if company.country == 'LA' else '' }}>LA - Lao People's Democratic Republic</option>
+              <option value="LB" {{ 'selected' if company.country == 'LB' else '' }}>LB - Lebanon</option>
+              <option value="LC" {{ 'selected' if company.country == 'LC' else '' }}>LC - Saint Lucia</option>
+              <option value="LI" {{ 'selected' if company.country == 'LI' else '' }}>LI - Liechtenstein</option>
+              <option value="LK" {{ 'selected' if company.country == 'LK' else '' }}>LK - Sri Lanka</option>
+              <option value="LR" {{ 'selected' if company.country == 'LR' else '' }}>LR - Liberia</option>
+              <option value="LS" {{ 'selected' if company.country == 'LS' else '' }}>LS - Lesotho</option>
+              <option value="LT" {{ 'selected' if company.country == 'LT' else '' }}>LT - Lithuania</option>
+              <option value="LU" {{ 'selected' if company.country == 'LU' else '' }}>LU - Luxembourg</option>
+              <option value="LV" {{ 'selected' if company.country == 'LV' else '' }}>LV - Latvia</option>
+              <option value="LY" {{ 'selected' if company.country == 'LY' else '' }}>LY - Libya</option>
+              <option value="MA" {{ 'selected' if company.country == 'MA' else '' }}>MA - Morocco</option>
+              <option value="MC" {{ 'selected' if company.country == 'MC' else '' }}>MC - Monaco</option>
+              <option value="MD" {{ 'selected' if company.country == 'MD' else '' }}>MD - Moldova</option>
+              <option value="ME" {{ 'selected' if company.country == 'ME' else '' }}>ME - Montenegro</option>
+              <option value="MF" {{ 'selected' if company.country == 'MF' else '' }}>MF - Saint Martin (French part)</option>
+              <option value="MG" {{ 'selected' if company.country == 'MG' else '' }}>MG - Madagascar</option>
+              <option value="MH" {{ 'selected' if company.country == 'MH' else '' }}>MH - Marshall Islands</option>
+              <option value="MK" {{ 'selected' if company.country == 'MK' else '' }}>MK - North Macedonia</option>
+              <option value="ML" {{ 'selected' if company.country == 'ML' else '' }}>ML - Mali</option>
+              <option value="MM" {{ 'selected' if company.country == 'MM' else '' }}>MM - Myanmar</option>
+              <option value="MN" {{ 'selected' if company.country == 'MN' else '' }}>MN - Mongolia</option>
+              <option value="MO" {{ 'selected' if company.country == 'MO' else '' }}>MO - Macao</option>
+              <option value="MP" {{ 'selected' if company.country == 'MP' else '' }}>MP - Northern Mariana Islands</option>
+              <option value="MQ" {{ 'selected' if company.country == 'MQ' else '' }}>MQ - Martinique</option>
+              <option value="MR" {{ 'selected' if company.country == 'MR' else '' }}>MR - Mauritania</option>
+              <option value="MS" {{ 'selected' if company.country == 'MS' else '' }}>MS - Montserrat</option>
+              <option value="MT" {{ 'selected' if company.country == 'MT' else '' }}>MT - Malta</option>
+              <option value="MU" {{ 'selected' if company.country == 'MU' else '' }}>MU - Mauritius</option>
+              <option value="MV" {{ 'selected' if company.country == 'MV' else '' }}>MV - Maldives</option>
+              <option value="MW" {{ 'selected' if company.country == 'MW' else '' }}>MW - Malawi</option>
+              <option value="MX" {{ 'selected' if company.country == 'MX' else '' }}>MX - Mexico</option>
+              <option value="MY" {{ 'selected' if company.country == 'MY' else '' }}>MY - Malaysia</option>
+              <option value="MZ" {{ 'selected' if company.country == 'MZ' else '' }}>MZ - Mozambique</option>
+              <option value="NA" {{ 'selected' if company.country == 'NA' else '' }}>NA - Namibia</option>
+              <option value="NC" {{ 'selected' if company.country == 'NC' else '' }}>NC - New Caledonia</option>
+              <option value="NE" {{ 'selected' if company.country == 'NE' else '' }}>NE - Niger</option>
+              <option value="NF" {{ 'selected' if company.country == 'NF' else '' }}>NF - Norfolk Island</option>
+              <option value="NG" {{ 'selected' if company.country == 'NG' else '' }}>NG - Nigeria</option>
+              <option value="NI" {{ 'selected' if company.country == 'NI' else '' }}>NI - Nicaragua</option>
+              <option value="NL" {{ 'selected' if company.country == 'NL' else '' }}>NL - Netherlands</option>
+              <option value="NO" {{ 'selected' if company.country == 'NO' else '' }}>NO - Norway</option>
+              <option value="NP" {{ 'selected' if company.country == 'NP' else '' }}>NP - Nepal</option>
+              <option value="NR" {{ 'selected' if company.country == 'NR' else '' }}>NR - Nauru</option>
+              <option value="NU" {{ 'selected' if company.country == 'NU' else '' }}>NU - Niue</option>
+              <option value="NZ" {{ 'selected' if company.country == 'NZ' else '' }}>NZ - New Zealand</option>
+              <option value="OM" {{ 'selected' if company.country == 'OM' else '' }}>OM - Oman</option>
+              <option value="PA" {{ 'selected' if company.country == 'PA' else '' }}>PA - Panama</option>
+              <option value="PE" {{ 'selected' if company.country == 'PE' else '' }}>PE - Peru</option>
+              <option value="PF" {{ 'selected' if company.country == 'PF' else '' }}>PF - French Polynesia</option>
+              <option value="PG" {{ 'selected' if company.country == 'PG' else '' }}>PG - Papua New Guinea</option>
+              <option value="PH" {{ 'selected' if company.country == 'PH' else '' }}>PH - Philippines</option>
+              <option value="PK" {{ 'selected' if company.country == 'PK' else '' }}>PK - Pakistan</option>
+              <option value="PL" {{ 'selected' if company.country == 'PL' else '' }}>PL - Poland</option>
+              <option value="PM" {{ 'selected' if company.country == 'PM' else '' }}>PM - Saint Pierre and Miquelon</option>
+              <option value="PN" {{ 'selected' if company.country == 'PN' else '' }}>PN - Pitcairn</option>
+              <option value="PR" {{ 'selected' if company.country == 'PR' else '' }}>PR - Puerto Rico</option>
+              <option value="PS" {{ 'selected' if company.country == 'PS' else '' }}>PS - Palestine</option>
+              <option value="PT" {{ 'selected' if company.country == 'PT' else '' }}>PT - Portugal</option>
+              <option value="PW" {{ 'selected' if company.country == 'PW' else '' }}>PW - Palau</option>
+              <option value="PY" {{ 'selected' if company.country == 'PY' else '' }}>PY - Paraguay</option>
+              <option value="QA" {{ 'selected' if company.country == 'QA' else '' }}>QA - Qatar</option>
+              <option value="RE" {{ 'selected' if company.country == 'RE' else '' }}>RE - Réunion</option>
+              <option value="RO" {{ 'selected' if company.country == 'RO' else '' }}>RO - Romania</option>
+              <option value="RS" {{ 'selected' if company.country == 'RS' else '' }}>RS - Serbia</option>
+              <option value="RU" {{ 'selected' if company.country == 'RU' else '' }}>RU - Russia</option>
+              <option value="RW" {{ 'selected' if company.country == 'RW' else '' }}>RW - Rwanda</option>
+              <option value="SA" {{ 'selected' if company.country == 'SA' else '' }}>SA - Saudi Arabia</option>
+              <option value="SB" {{ 'selected' if company.country == 'SB' else '' }}>SB - Solomon Islands</option>
+              <option value="SC" {{ 'selected' if company.country == 'SC' else '' }}>SC - Seychelles</option>
+              <option value="SD" {{ 'selected' if company.country == 'SD' else '' }}>SD - Sudan</option>
+              <option value="SE" {{ 'selected' if company.country == 'SE' else '' }}>SE - Sweden</option>
+              <option value="SG" {{ 'selected' if company.country == 'SG' else '' }}>SG - Singapore</option>
+              <option value="SH" {{ 'selected' if company.country == 'SH' else '' }}>SH - Saint Helena, Ascension and Tristan da Cunha</option>
+              <option value="SI" {{ 'selected' if company.country == 'SI' else '' }}>SI - Slovenia</option>
+              <option value="SJ" {{ 'selected' if company.country == 'SJ' else '' }}>SJ - Svalbard and Jan Mayen</option>
+              <option value="SK" {{ 'selected' if company.country == 'SK' else '' }}>SK - Slovakia</option>
+              <option value="SL" {{ 'selected' if company.country == 'SL' else '' }}>SL - Sierra Leone</option>
+              <option value="SM" {{ 'selected' if company.country == 'SM' else '' }}>SM - San Marino</option>
+              <option value="SN" {{ 'selected' if company.country == 'SN' else '' }}>SN - Senegal</option>
+              <option value="SO" {{ 'selected' if company.country == 'SO' else '' }}>SO - Somalia</option>
+              <option value="SR" {{ 'selected' if company.country == 'SR' else '' }}>SR - Suriname</option>
+              <option value="SS" {{ 'selected' if company.country == 'SS' else '' }}>SS - South Sudan</option>
+              <option value="ST" {{ 'selected' if company.country == 'ST' else '' }}>ST - Sao Tome and Principe</option>
+              <option value="SV" {{ 'selected' if company.country == 'SV' else '' }}>SV - El Salvador</option>
+              <option value="SX" {{ 'selected' if company.country == 'SX' else '' }}>SX - Sint Maarten (Dutch part)</option>
+              <option value="SY" {{ 'selected' if company.country == 'SY' else '' }}>SY - Syria</option>
+              <option value="SZ" {{ 'selected' if company.country == 'SZ' else '' }}>SZ - Eswatini</option>
+              <option value="TC" {{ 'selected' if company.country == 'TC' else '' }}>TC - Turks and Caicos Islands</option>
+              <option value="TD" {{ 'selected' if company.country == 'TD' else '' }}>TD - Chad</option>
+              <option value="TF" {{ 'selected' if company.country == 'TF' else '' }}>TF - French Southern Territories</option>
+              <option value="TG" {{ 'selected' if company.country == 'TG' else '' }}>TG - Togo</option>
+              <option value="TH" {{ 'selected' if company.country == 'TH' else '' }}>TH - Thailand</option>
+              <option value="TJ" {{ 'selected' if company.country == 'TJ' else '' }}>TJ - Tajikistan</option>
+              <option value="TK" {{ 'selected' if company.country == 'TK' else '' }}>TK - Tokelau</option>
+              <option value="TL" {{ 'selected' if company.country == 'TL' else '' }}>TL - Timor-Leste</option>
+              <option value="TM" {{ 'selected' if company.country == 'TM' else '' }}>TM - Turkmenistan</option>
+              <option value="TN" {{ 'selected' if company.country == 'TN' else '' }}>TN - Tunisia</option>
+              <option value="TO" {{ 'selected' if company.country == 'TO' else '' }}>TO - Tonga</option>
+              <option value="TR" {{ 'selected' if company.country == 'TR' else '' }}>TR - Turkey</option>
+              <option value="TT" {{ 'selected' if company.country == 'TT' else '' }}>TT - Trinidad and Tobago</option>
+              <option value="TV" {{ 'selected' if company.country == 'TV' else '' }}>TV - Tuvalu</option>
+              <option value="TW" {{ 'selected' if company.country == 'TW' else '' }}>TW - Taiwan</option>
+              <option value="TZ" {{ 'selected' if company.country == 'TZ' else '' }}>TZ - Tanzania</option>
+              <option value="UA" {{ 'selected' if company.country == 'UA' else '' }}>UA - Ukraine</option>
+              <option value="UG" {{ 'selected' if company.country == 'UG' else '' }}>UG - Uganda</option>
+              <option value="UM" {{ 'selected' if company.country == 'UM' else '' }}>UM - United States Minor Outlying Islands</option>
+              <option value="US" {{ 'selected' if company.country == 'US' else '' }}>US - United States</option>
+              <option value="UY" {{ 'selected' if company.country == 'UY' else '' }}>UY - Uruguay</option>
+              <option value="UZ" {{ 'selected' if company.country == 'UZ' else '' }}>UZ - Uzbekistan</option>
+              <option value="VA" {{ 'selected' if company.country == 'VA' else '' }}>VA - Vatican City</option>
+              <option value="VC" {{ 'selected' if company.country == 'VC' else '' }}>VC - Saint Vincent and the Grenadines</option>
+              <option value="VE" {{ 'selected' if company.country == 'VE' else '' }}>VE - Venezuela</option>
+              <option value="VG" {{ 'selected' if company.country == 'VG' else '' }}>VG - Virgin Islands (British)</option>
+              <option value="VI" {{ 'selected' if company.country == 'VI' else '' }}>VI - Virgin Islands (U.S.)</option>
+              <option value="VN" {{ 'selected' if company.country == 'VN' else '' }}>VN - Vietnam</option>
+              <option value="VU" {{ 'selected' if company.country == 'VU' else '' }}>VU - Vanuatu</option>
+              <option value="WF" {{ 'selected' if company.country == 'WF' else '' }}>WF - Wallis and Futuna</option>
+              <option value="WS" {{ 'selected' if company.country == 'WS' else '' }}>WS - Samoa</option>
+              <option value="YE" {{ 'selected' if company.country == 'YE' else '' }}>YE - Yemen</option>
+              <option value="YT" {{ 'selected' if company.country == 'YT' else '' }}>YT - Mayotte</option>
+              <option value="ZA" {{ 'selected' if company.country == 'ZA' else '' }}>ZA - South Africa</option>
+              <option value="ZM" {{ 'selected' if company.country == 'ZM' else '' }}>ZM - Zambia</option>
+              <option value="ZW" {{ 'selected' if company.country == 'ZW' else '' }}>ZW - Zimbabwe</option>
+            </select>
+          </div>
+
+          <div class="col-12"><hr class="my-0"></div>
+
+          <div class="col-md-4">
+            <label class="form-label">Business Type</label>
+            <input type="text" id="e-businesstype" class="form-control" value="{{ company.businessType or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Product</label>
+            <select id="e-product" class="form-select">
+              <option value="">— Select —</option>
+              {% for p in product_list %}
+              <option value="{{ p }}" {{ 'selected' if company.product == p else '' }}>{{ p }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Shipment Mode</label>
+            <select id="e-mode" class="form-select">
+              <option value="">— Select —</option>
+              <option value="AIR" {{ 'selected' if company.mode == 'AIR' else '' }}>AIR</option>
+              <option value="OCEAN" {{ 'selected' if company.mode == 'OCEAN' else '' }}>OCEAN</option>
+              <option value="AIR_OCEAN" {{ 'selected' if company.mode == 'AIR_OCEAN' else '' }}>AIR_OCEAN</option>
+              <option value="LAND" {{ 'selected' if company.mode == 'LAND' else '' }}>LAND</option>
+              <option value="OTHERS" {{ 'selected' if company.mode == 'OTHERS' else '' }}>OTHERS</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Shipment Type</label>
+            <select id="e-shipmenttype" class="form-select">
+              <option value="">— Select —</option>
+              <option value="IA_IMP_AIR" {{ 'selected' if company.shipmentType == 'IA_IMP_AIR' else '' }}>IA_IMP_AIR</option>
+              <option value="EA_EXP_AIR" {{ 'selected' if company.shipmentType == 'EA_EXP_AIR' else '' }}>EA_EXP_AIR</option>
+              <option value="IL_IMP_LCL" {{ 'selected' if company.shipmentType == 'IL_IMP_LCL' else '' }}>IL_IMP_LCL</option>
+              <option value="IF_IMP_FCL" {{ 'selected' if company.shipmentType == 'IF_IMP_FCL' else '' }}>IF_IMP_FCL</option>
+              <option value="EL_EXP_LCL" {{ 'selected' if company.shipmentType == 'EL_EXP_LCL' else '' }}>EL_EXP_LCL</option>
+              <option value="EX_EXIM" {{ 'selected' if company.shipmentType == 'EX_EXIM' else '' }}>EX_EXIM</option>
+              <option value="NE_NOEXIM" {{ 'selected' if company.shipmentType == 'NE_NOEXIM' else '' }}>NE_NOEXIM</option>
+              <option value="CC_CUSTOMS_CLEARANCE_ONLY" {{ 'selected' if company.shipmentType == 'CC_CUSTOMS_CLEARANCE_ONLY' else '' }}>CC_CUSTOMS_CLEARANCE_ONLY</option>
+              <option value="COURIER_DOM" {{ 'selected' if company.shipmentType == 'COURIER_DOM' else '' }}>COURIER_DOM</option>
+              <option value="COURIER_INT" {{ 'selected' if company.shipmentType == 'COURIER_INT' else '' }}>COURIER_INT</option>
+              <option value="NOMINATION" {{ 'selected' if company.shipmentType == 'NOMINATION' else '' }}>NOMINATION</option>
+              <option value="OTHERS" {{ 'selected' if company.shipmentType == 'OTHERS' else '' }}>OTHERS</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Goods / Products <small class="text-muted">(comma separated)</small></label>
+            <input type="text" id="e-goods" class="form-control" value="{{ company.goodsTypes | join(', ') }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Remarks</label>
+            <input type="text" id="e-remarks" class="form-control" value="{{ company.remarks or '' }}">
+          </div>
+
+          <div class="col-12"><hr class="my-0"></div>
+
+          <div class="col-md-3">
+            <label class="form-label">Air Import Volume</label>
+            <input type="text" id="e-airImportVolume" class="form-control" value="{{ company.airImportVolume or '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Air Export Volume</label>
+            <input type="text" id="e-airExportVolume" class="form-control" value="{{ company.airExportVolume or '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Ocean Import Volume</label>
+            <input type="text" id="e-oceanImportVolume" class="form-control" value="{{ company.oceanImportVolume or '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Ocean Export Volume</label>
+            <input type="text" id="e-oceanExportVolume" class="form-control" value="{{ company.oceanExportVolume or '' }}">
+          </div>
+
+          {% if user.role == 'admin' %}
+          <div class="col-12"><hr class="my-0"></div>
+          <div class="col-md-6">
+            <label class="form-label">Assigned Agent</label>
+            <select id="e-agent" class="form-select">
+              <option value="">Unassigned</option>
+              {% for a in agents %}
+              <option value="{{ a.id }}" {{ 'selected' if company.assignedAgentId == a.id else '' }}>{{ a.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCompany()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Contact Modal -->
+<div class="modal fade" id="contactModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title fw-bold" id="ctModalTitle">Add Contact</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="ct-id" value="">
+        <div class="mb-3">
+          <label class="form-label">Name <span class="text-danger">*</span></label>
+          <input type="text" id="ct-name" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Designation</label>
+          <input type="text" id="ct-designation" class="form-control" placeholder="e.g. Manager, Director">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" id="ct-email" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Phone Numbers <small class="text-muted">(comma separated)</small></label>
+          <input type="text" id="ct-phones" class="form-control" placeholder="+1 555 001, +1 555 002">
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="ct-primary">
+          <label class="form-check-label">Primary contact</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="saveContact()">Save Contact</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Log Call Modal -->
+<div class="modal fade" id="callModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title fw-bold">Log Call</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Contact Person</label>
+          <select id="call-contact" class="form-select">
+            <option value="">— Select contact (optional) —</option>
+            {% for ct in contacts %}
+            <option value="{{ ct.id }}">{{ ct.name }}{% if ct.designation %} ({{ ct.designation }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Outcome <span class="text-danger">*</span></label>
+          <select id="call-outcome" class="form-select">
+            {% for o in call_outcomes %}
+            <option value="{{ o }}">{{ o }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label d-flex justify-content-between align-items-center">
+            <span>Company Status</span>
+            <span id="call-status-hint" class="fw-normal text-muted" style="font-size:.78rem"></span>
+          </label>
+          <select id="call-status" class="form-select">
+            <option value="">— select an outcome first —</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Notes</label>
+          <textarea id="call-notes" class="form-control" rows="4" placeholder="What was discussed…"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Schedule Follow-up Date <small class="text-muted">(optional)</small></label>
+          <input type="date" id="call-followup" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-success" onclick="submitCall()"><i class="fas fa-phone me-1"></i>Save Call</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const COMPANY_ID = '{{ company.id }}';
+
+function editSuperKey() {
+  document.getElementById('sckey-edit').classList.remove('d-none');
+  document.getElementById('sckey-input').focus();
+}
+function cancelSuperKey() {
+  document.getElementById('sckey-edit').classList.add('d-none');
+}
+async function saveSuperKey() {
+  const val = document.getElementById('sckey-input').value.trim().toUpperCase();
+  if (!val) return;
+  try {
+    await api('PUT', `/api/companies/${COMPANY_ID}`, { superCompanyKey: val });
+    location.reload();
+  } catch(e) { toast(e.message, 'danger'); }
+}
+
+async function saveCompany() {
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const body = {
+    name: g('e-name'),
+    status: g('e-status'),
+    callStatus: g('e-callstatus'),
+    website: g('e-website'),
+    address1: g('e-address1'),
+    address2: g('e-address2'),
+    country: g('e-country'),
+    businessType: g('e-businesstype'),
+    product: g('e-product'),
+    mode: g('e-mode'),
+    shipmentType: g('e-shipmenttype'),
+    goodsTypes: g('e-goods').split(',').map(v => v.trim()).filter(Boolean),
+    remarks: g('e-remarks'),
+    airImportVolume: g('e-airImportVolume'),
+    airExportVolume: g('e-airExportVolume'),
+    oceanImportVolume: g('e-oceanImportVolume'),
+    oceanExportVolume: g('e-oceanExportVolume'),
+  };
+  {% if user.role == 'admin' %}
+  body.assignedAgentId = document.getElementById('e-agent').value || null;
+  {% endif %}
+  try {
+    await api('PUT', `/api/companies/${COMPANY_ID}`, body);
+    location.reload();
+  } catch(e) { toast(e.message, 'danger'); }
+}
+
+async function saveContact() {
+  const id = document.getElementById('ct-id').value;
+  const body = {
+    name: document.getElementById('ct-name').value.trim(),
+    designation: document.getElementById('ct-designation').value.trim(),
+    email: document.getElementById('ct-email').value.trim(),
+    phones: document.getElementById('ct-phones').value,
+    isPrimary: document.getElementById('ct-primary').checked,
+  };
+  try {
+    const url = id ? `/api/contacts/${id}` : `/api/companies/${COMPANY_ID}/contacts`;
+    const method = id ? 'PUT' : 'POST';
+    await api(method, url, body);
+    bootstrap.Modal.getInstance(document.getElementById('contactModal')).hide();
+    location.reload();
+  } catch(e) { toast(e.message, 'danger'); }
+}
+
+function editContact(id) {
+  const row = document.getElementById('ct-' + id);
+  const cells = row.querySelectorAll('td');
+  const val = t => { const v = t.trim(); return v === '—' ? '' : v; };
+  document.getElementById('ct-id').value = id;
+  document.getElementById('ct-name').value = val(cells[0].textContent);
+  document.getElementById('ct-designation').value = val(cells[1].textContent);
+  document.getElementById('ct-email').value = val(cells[2].textContent);
+  document.getElementById('ct-phones').value = val(cells[3].textContent);
+  document.getElementById('ct-primary').checked = !!cells[4].querySelector('i');
+  document.getElementById('ctModalTitle').textContent = 'Edit Contact';
+  new bootstrap.Modal(document.getElementById('contactModal')).show();
+}
+
+async function delContact(id) {
+  if (!confirm('Delete this contact?')) return;
+  try {
+    await api('DELETE', `/api/contacts/${id}`);
+    document.getElementById('ct-' + id).remove();
+    toast('Contact deleted');
+  } catch(e) { toast(e.message, 'danger'); }
+}
+
+async function submitCall() {
+  const statusEl = document.getElementById('call-status');
+  const body = {
+    contactId: document.getElementById('call-contact').value || null,
+    outcome: document.getElementById('call-outcome').value,
+    status: statusEl.disabled ? null : (statusEl.value || null),
+    notes: document.getElementById('call-notes').value,
+    followUpDate: document.getElementById('call-followup').value || null,
+  };
+  try {
+    await api('POST', `/api/companies/${COMPANY_ID}/calls`, body);
+    bootstrap.Modal.getInstance(document.getElementById('callModal')).hide();
+    location.reload();
+  } catch(e) { toast(e.message, 'danger'); }
+}
+
+// ── Call outcome → company status mapping ──────────────────────────────────
+const CURRENT_STATUS = {{ company.status | tojson }};
+const ALL_STATUSES   = {{ statuses | tojson }};
+
+// null  = hold existing status (lock field)
+// array = allowed statuses agent can pick from
+const CALL_STATUS_MAP = {
+  "EE_EXISTING_CLIENT":             ["SUSPECT- ALL_CLIENTS","PROSPECT- POSITIVE_FEEDBACK","APPROACH- ENQUIRY_SHARED","NEGOTIATION- RATES_DISCUSS_PAYMENT_DAYS","CLOSURE- BUSINESS_START_SUPPORT","CNB- CALL_FOR_NEXT_BUSINESS","OTHERS"],
+  "ES_ENQUIRY_SHARED":              ["APPROACH- ENQUIRY_SHARED"],
+  "NA_NOT_ANSWER":                  null,
+  "NE_NUMBER_NOT_EXIST":            ["OTHERS"],
+  "NI_NOT_INTERESTED":              ["NOT_INTERESTED"],
+  "NC_NO_CLEAR_FEEDBACK":           ["SUSPECT- ALL_CLIENTS"],
+  "CD_CALL_DISCONNECT":             null,
+  "NN_NO_NUMBER":                   ["OTHERS-NoNumber"],
+  "NW_NO_WEBSITE":                  ["OTHERS-NoWebsite"],
+  "BUSY":                           null,
+  "CM_CALL_ME_LATER":               null,
+  "APPOINTMENT":                    ["PROSPECT- POSITIVE_FEEDBACK"],
+  "PERMANENTLY_CLOSED":             ["OTHERS-PERMANENTLY_CLOSED"],
+  "FRADULENT":                      ["OTHERS-FRADULENT"],
+  "PAYMENT_ISSUE":                  ["OTHERS-PAYMENT_ISSUE"],
+  "CONTRACT_YEARLY":                ["PROSPECT- POSITIVE_FEEDBACK"],
+  "CONTRACT_QUATERLY":              ["PROSPECT- POSITIVE_FEEDBACK"],
+  "CONTRACT_MNC":                   ["OTHERS-CONTRACT_MNC"],
+  "MANAGEMENT_DECISION_IS_FINAL":   ["OTHERS-MANAGEMENT_DECISION_IS_FINAL"],
+  "SOEF_SUPPORT_ONLY_EXISTING_FFF": ["OTHERS-SOEF_SUPPORT_ONLY_EXISTING_FFF"],
+  "RR_RECEPTION_REJECTION":         ["SUSPECT- ALL_CLIENTS"],
+  "SR_SECURITY_REJECTION":          ["SUSPECT- ALL_CLIENTS"],
+  "PS_PROFILE_SENT":                ["PROSPECT- POSITIVE_FEEDBACK"],
+  "UNKNOWN":                        ["OTHERS"],
+  "NE_NEGOTIATION":                 ["NEGOTIATION- RATES_DISCUSS_PAYMENT_DAYS","CNB- CALL_FOR_NEXT_BUSINESS"],
+  "CLOSURE":                        ["CLOSURE- BUSINESS_START_SUPPORT"],
+  "ORDER":                          ["CNB- CALL_FOR_NEXT_BUSINESS"],
+  "OTHER":                          ALL_STATUSES,
+};
+
+function updateStatusFromOutcome() {
+  const outcome  = document.getElementById('call-outcome').value;
+  const sel      = document.getElementById('call-status');
+  const hint     = document.getElementById('call-status-hint');
+  const allowed  = Object.prototype.hasOwnProperty.call(CALL_STATUS_MAP, outcome)
+                     ? CALL_STATUS_MAP[outcome]
+                     : null;
+
+  if (!outcome) {
+    sel.innerHTML = '<option value="">— select an outcome first —</option>';
+    sel.disabled  = true;
+    hint.textContent = '';
+    return;
+  }
+
+  if (allowed === null) {
+    // Hold existing status
+    sel.innerHTML = `<option value="">${CURRENT_STATUS.replace(/_/g,' ')} (unchanged)</option>`;
+    sel.disabled  = true;
+    hint.textContent = '🔒 locked — current status preserved';
+    return;
+  }
+
+  sel.disabled = false;
+  sel.innerHTML = allowed.map(s =>
+    `<option value="${s}">${s.replace(/_/g,' ')}</option>`
+  ).join('');
+
+  if (allowed.length === 1) {
+    hint.textContent = '✓ auto-assigned';
+  } else {
+    hint.textContent = 'Please select one';
+  }
+}
+
+document.getElementById('call-outcome').addEventListener('change', updateStatusFromOutcome);
+
+document.getElementById('callModal').addEventListener('show.bs.modal', () => {
+  document.getElementById('call-outcome').value = '';
+  document.getElementById('call-notes').value   = '';
+  document.getElementById('call-followup').value = '';
+  updateStatusFromOutcome();
+});
+
+document.getElementById('contactModal').addEventListener('hidden.bs.modal', () => {
+  document.getElementById('ct-id').value = '';
+});
+
+// Reset contact modal only when opening for a new contact (not edit)
+document.getElementById('contactModal').addEventListener('show.bs.modal', () => {
+  if (document.getElementById('ct-id').value) return;
+  document.getElementById('ct-name').value = '';
+  document.getElementById('ct-designation').value = '';
+  document.getElementById('ct-email').value = '';
+  document.getElementById('ct-phones').value = '';
+  document.getElementById('ct-primary').checked = false;
+  document.getElementById('ctModalTitle').textContent = 'Add Contact';
+});
+</script>
+{% endblock %}

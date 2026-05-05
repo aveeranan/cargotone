@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — CargoTone{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats row -->
+<div class="row g-4 mb-5">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#dbeafe"><i class="fas fa-building" style="color:#1d4ed8"></i></div>
+      <div class="stat-value">{{ stats.total_assigned }}</div>
+      <div class="stat-label">{{ 'Total Companies' if user.role == 'admin' else 'My Companies' }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#dcfce7"><i class="fas fa-phone" style="color:#15803d"></i></div>
+      <div class="stat-value">{{ stats.calls_today }}</div>
+      <div class="stat-label">Calls Today</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#eff6ff"><i class="fas fa-calendar-day" style="color:#1d4ed8"></i></div>
+      <div class="stat-value">{{ stats.follow_up_today }}</div>
+      <div class="stat-label">Follow-ups Today</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#fef2f2"><i class="fas fa-triangle-exclamation" style="color:#dc2626"></i></div>
+      <div class="stat-value">{{ stats.missed }}</div>
+      <div class="stat-label">Missed Follow-ups</div>
+    </div>
+  </div>
+</div>
+
+<!-- Call Queue -->
+{% set sections = [
+  ('missed',   'Missed',   'fa-circle-exclamation'),
+  ('today',    'Today',    'fa-calendar-day'),
+  ('tomorrow', 'Tomorrow', 'fa-calendar-plus'),
+] %}
+
+{% for key, label, icon in sections %}
+{% set items = queue[key] %}
+<div class="queue-section">
+  <div class="queue-header {{ key }}" onclick="toggle('{{ key }}')">
+    <i class="fas {{ icon }}"></i>
+    {{ label }}
+    <span class="q-count">{{ items | length }}</span>
+    <i class="fas fa-chevron-down ms-auto" id="chev-{{ key }}"></i>
+  </div>
+  <div id="sect-{{ key }}" class="queue-items d-none">
+    {% if items %}
+      {% for c in items %}
+      <div class="queue-item">
+        <div style="min-width:0;flex:1">
+          <a href="/companies/{{ c.id }}" class="d-block fw-semibold">{{ c.name }}</a>
+          {% if c.primaryPhone %}
+          <div style="font-size:.78rem;margin-top:2px">
+            <i class="fas fa-phone" style="color:#16a34a;font-size:.7rem"></i>
+            <a href="tel:{{ c.primaryPhone }}" class="text-decoration-none" style="color:#16a34a">{{ c.primaryPhone }}</a>
+            {% if c.primaryContactName %}
+            <span class="text-muted"> · {{ c.primaryContactName }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if c.lastNote %}
+          <div class="queue-note">{{ c.lastNote }}</div>
+          {% endif %}
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge-status s-{{ c.status }}">{{ c.status | status_label }}</span>
+          <span class="text-muted" style="font-size:.75rem">{{ c.followUpDate | fmt_date }}</span>
+          <a href="/companies/{{ c.id }}" class="btn btn-sm btn-outline-primary py-0">
+            <i class="fas fa-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-muted text-center py-3 mb-0" style="font-size:.85rem">No items in this section</p>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggle(key) {
+    const sect = document.getElementById('sect-' + key);
+    const chev = document.getElementById('chev-' + key);
+    sect.classList.toggle('d-none');
+    chev.style.transform = sect.classList.contains('d-none') ? 'rotate(-90deg)' : '';
+  }
+  // All chevrons start rotated (closed)
+  document.querySelectorAll('[id^="chev-"]').forEach(c => c.style.transform = 'rotate(-90deg)');
+  // Open only today
+  const todaySect = document.getElementById('sect-today');
+  const todayChev = document.getElementById('chev-today');
+  if (todaySect) { todaySect.classList.remove('d-none'); todayChev.style.transform = ''; }
+</script>
+{% endblock %}

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Site Visit Planning — CargoTone{% endblock %}
+{% block page_title %}Site Visit Planning{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="form-card mb-4">
+  <form method="GET" action="/site-visit" class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label fw-semibold mb-1" style="font-size:.8rem">City / Region</label>
+      <input type="text" name="city" value="{{ selected_city }}" class="form-control form-control-sm" list="city-list" placeholder="Type or select city…">
+      <datalist id="city-list">
+        {% for c in cities %}<option value="{{ c }}">{% endfor %}
+      </datalist>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold mb-1" style="font-size:.8rem">Status</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="">All Statuses</option>
+        {% for s in statuses %}
+        <option value="{{ s }}" {{ 'selected' if selected_status == s else '' }}>{{ s | status_label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold mb-1" style="font-size:.8rem">Goods Type</label>
+      <input type="text" name="goods" value="{{ selected_goods }}" class="form-control form-control-sm" list="goods-list" placeholder="e.g. Electronics">
+      <datalist id="goods-list">
+        {% for g in goods_types %}<option value="{{ g }}">{% endfor %}
+      </datalist>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-primary btn-sm px-4" type="submit"><i class="fas fa-magnifying-glass me-1"></i>Search</button>
+    </div>
+    <div class="col-auto">
+      <a href="/site-visit" class="btn btn-outline-secondary btn-sm">Clear</a>
+    </div>
+  </form>
+</div>
+
+<!-- Results -->
+{% if selected_city or selected_status or selected_goods %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <span class="fw-semibold">{{ companies | length }} companies found</span>
+  {% if companies %}
+  <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="fas fa-print me-1"></i>Print</button>
+  {% endif %}
+</div>
+
+{% if companies %}
+<div class="row g-3">
+  {% for c in companies %}
+  <div class="col-md-6 col-xl-4">
+    <div class="form-card h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <a href="/companies/{{ c.id }}" class="fw-bold text-decoration-none" style="color:#1a2332">{{ c.name }}</a>
+          {% if c.website %}<div><a href="{{ c.website }}" target="_blank" class="text-muted" style="font-size:.75rem">{{ c.website }}</a></div>{% endif %}
+        </div>
+        <span class="badge-status s-{{ c.status }}">{{ c.status | status_label }}</span>
+      </div>
+
+      {% if c.address %}
+      <div class="d-flex gap-2 mb-2">
+        <i class="fas fa-map-marker-alt text-muted mt-1" style="font-size:.8rem"></i>
+        <span style="font-size:.85rem">{{ c.address }}</span>
+      </div>
+      {% endif %}
+
+      {% if c.goodsTypes %}
+      <div class="d-flex flex-wrap gap-1 mb-2">
+        {% for g in c.goodsTypes %}
+        <span class="badge bg-light text-dark" style="font-size:.72rem">{{ g }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if c.contacts %}
+      <hr class="my-2">
+      <div style="font-size:.8rem; font-weight:600; color:#64748b; margin-bottom:6px">CONTACTS</div>
+      {% for ct in c.contacts %}
+      <div class="mb-2">
+        <div class="fw-semibold" style="font-size:.85rem">
+          {{ ct.name }}{% if ct.designation %} <span class="text-muted fw-normal">· {{ ct.designation }}</span>{% endif %}
+          {% if ct.isPrimary %}<i class="fas fa-star text-warning ms-1" style="font-size:.7rem"></i>{% endif %}
+        </div>
+        {% if ct.phones %}
+        <div class="d-flex flex-wrap gap-2 mt-1">
+          {% for ph in ct.phones %}
+          <a href="tel:{{ ph }}" class="badge bg-success text-white text-decoration-none" style="font-size:.75rem">
+            <i class="fas fa-phone me-1"></i>{{ ph }}
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if ct.email %}
+        <div><a href="mailto:{{ ct.email }}" style="font-size:.8rem; color:#3b82f6">{{ ct.email }}</a></div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="text-muted" style="font-size:.8rem">No contacts added</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="fas fa-map-location-dot fa-2x mb-3 d-block"></i>
+  No companies found for these filters
+</div>
+{% endif %}
+
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="fas fa-map-location-dot fa-3x mb-3 d-block" style="color:#cbd5e1"></i>
+  <h5 class="fw-semibold mb-2" style="color:#475569">Plan Your Site Visit</h5>
+  <p>Filter companies by city, status, or goods type to plan your trip and see contact details at a glance.</p>
+</div>
+{% endif %}
+{% endblock %}

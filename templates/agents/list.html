@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Agents — CargoTone{% endblock %}
+{% block page_title %}Agents{% endblock %}
+
+{% block topbar_right %}
+<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newAgentModal">
+  <i class="fas fa-user-plus me-1"></i>Add User
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="table-card">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Name</th><th>Agent ID</th><th>Email</th><th>Role</th>
+        <th>Companies</th><th>Calls Today</th><th>Status</th><th class="text-end">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in agents %}
+      <tr>
+        <td class="fw-semibold">{{ a.name }}</td>
+        <td><code style="font-size:.8rem;color:#64748b">{{ a.agentId or '—' }}</code></td>
+        <td>{{ a.email }}</td>
+        <td><span class="badge bg-{{ 'primary' if a.role == 'admin' else 'secondary' }}">{{ a.role | title }}</span></td>
+        <td>{{ a.company_count }}</td>
+        <td>{{ a.calls_today }}</td>
+        <td>
+          {% if a.isActive %}
+            <span class="badge bg-success">Active</span>
+          {% else %}
+            <span class="badge bg-danger">Inactive</span>
+          {% endif %}
+        </td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-secondary" onclick="resetPwd('{{ a.id }}','{{ a.name }}')">Reset Pwd</button>
+          {% if a.role != 'admin' %}
+          <button class="btn btn-sm btn-outline-primary" onclick="openSplit('{{ a.id }}','{{ a.name }}')">Split</button>
+          {% if a.isActive %}
+          <button class="btn btn-sm btn-outline-danger" onclick="deactivate('{{ a.id }}','{{ a.name }}')">Deactivate</button>
+          {% else %}
+          <button class="btn btn-sm btn-outline-success" onclick="activate('{{ a.id }}')">Activate</button>
+          {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- New User Modal -->
+<div class="modal fade" id="newAgentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title fw-bold">Add New User</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-8">
+            <label class="form-label">Full Name <span class="text-danger">*</span></label>
+            <input type="text" id="a-name" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Agent ID <span class="text-danger">*</span></label>
+            <input type="text" id="a-agentid" class="form-control" placeholder="e.g. EMP001" oninput="previewEmail()">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="text" id="a-email-display" class="form-control" disabled placeholder="Auto-generated from Agent ID">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Role</label>
+          <select id="a-role" class="form-select">
+            <option value="agent">Agent</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password <span class="text-danger">*</span></label>
+          <input type="password" id="a-pwd" class="form-control">
+          <div class="form-text">Min 8 chars, uppercase, number, special character (!@#$…)</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="createAgent()">Create User</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetPwdModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title fw-bold">Reset Password — <span id="rp-name"></span></h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="rp-id">
+        <div class="mb-3">
+          <label class="form-label">New Password</label>
+          <input type="password" id="rp-pwd" class="form-control">
+          <div class="form-text">Min 8 chars, uppercase, number, special character</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-warning" onclick="doResetPwd()">Reset Password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Split Companies Modal -->
+<div class="modal fade" id="splitModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Split Companies — <span id="split-name"></span></h6>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted" style="font-size:.875rem">Select companies to reassign and choose a target agent for each.</p>
+        <div id="split-list">Loading…</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="doSplit()">Reassign Selected</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const AGENTS = {{ agents | tojson }};
+const activeAgents = AGENTS.filter(a => a.isActive && a.role === 'agent');
+
+const COMPANY_DOMAIN = 'cargotone.com';
+
+function previewEmail() {
+  const aid = document.getElementById('a-agentid').value.trim().toLowerCase();
+  document.getElementById('a-email-display').value = aid ? `${aid}@${COMPANY_DOMAIN}` : '';
+}
+
+async function createAgent() {
+  const body = {
+    name: document.getElementById('a-name').value.trim(),
+    agentId: document.getElementById('a-agentid').value.trim(),
+    role: document.getElementById('a-role').value,
+    password: document.getElementById('a-pwd').value,
+  };
+  try {
+    await api('POST', '/api/agents', body);
+    location.reload();
+  } catch(e) { toast(e.message, 'danger'); }
+}
+
+function resetPwd(id, name) {
+  document.getElementById('rp-id').value = id;
+  document.getElementById('rp-name').textContent = name;
+  document.getElementById('rp-pwd').value = '';
+  new bootstrap.Modal(document.getElementById('resetPwdModal')).show();
+}
+
+async function doResetPwd() {
+  const id = document.getElementById('rp-id').value;
+  const pwd = document.getElementById('rp-pwd').value;
+  try {
+    await api('POST', '/api/auth/reset-password', { agentId: id, newPassword: pwd });
+    bootstrap.Modal.getInstance(document.getElementById('resetPwdModal')).hide();
+    toast('Password reset successfully');
+  } catch(e) { toast(e.message, 'danger'); }
+}
+
+async function deactivate(id, name) {
+  if (!confirm(`Deactivate ${name}? Their companies will be unassigned.`)) return;
+  try {
+    await api('PUT', `/api/agents/${id}`, { isActive: false });
+    location.reload();
+  } catch(e) { toast(e.message, 'danger'); }
+}
+
+async function activate(id) {
+  try {
+    await api('PUT', `/api/agents/${id}`, { isActive: true });
+    location.reload();
+  } catch(e) { toast(e.message, 'danger'); }
+}
+
+let splitAgentId = '';
+
+async function openSplit(id, name) {
+  splitAgentId = id;
+  document.getElementById('split-name').textContent = name;
+  document.getElementById('split-list').innerHTML = 'Loading…';
+  new bootstrap.Modal(document.getElementById('splitModal')).show();
+  const companies = await fetch(`/api/agents/${id}/companies`).then(r => r.json());
+  if (!companies.length) {
+    document.getElementById('split-list').innerHTML = '<p class="text-muted">No companies assigned to this agent.</p>';
+    return;
+  }
+  const options = activeAgents.filter(a => a.id !== id).map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+  const rows = companies.map(c => `
+    <div class="d-flex align-items-center gap-3 border rounded p-2 mb-2">
+      <input type="checkbox" class="form-check-input split-check" value="${c.id}" id="sc-${c.id}">
+      <label for="sc-${c.id}" class="flex-grow-1 mb-0">${c.name}</label>
+      <select class="form-select form-select-sm w-auto split-target" data-cid="${c.id}">
+        <option value="">Select agent…</option>${options}
+      </select>
+    </div>`).join('');
+  document.getElementById('split-list').innerHTML = rows;
+}
+
+async function doSplit() {
+  const checks = document.querySelectorAll('.split-check:checked');
+  const assignments = [];
+  let valid = true;
+  checks.forEach(cb => {
+    const cid = cb.value;
+    const sel = document.querySelector(`.split-target[data-cid="${cid}"]`);
+    if (!sel.value) { valid = false; return; }
+    assignments.push({ companyId: cid, toAgentId: sel.value });
+  });
+  if (!valid) return toast('Please select a target agent for each checked company', 'warning');
+  if (!assignments.length) return toast('No companies selected', 'warning');
+  try {
+    const res = await api('POST', '/api/companies/split', { assignments });
+    bootstrap.Modal.getInstance(document.getElementById('splitModal')).hide();
+    toast(`${res.count} companies reassigned`);
+    setTimeout(() => location.reload(), 1000);
+  } catch(e) { toast(e.message, 'danger'); }
+}
+</script>
+{% endblock %}
