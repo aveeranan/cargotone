@@ -29,6 +29,13 @@ def get_by_id(user_id: str) -> Optional[dict]:
             return _row_to_dict(cur.fetchone())
 
 
+def get_by_agent_id(agent_id: str) -> Optional[dict]:
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM users WHERE lower(agent_id) = %s", (agent_id.strip().lower(),))
+            return _row_to_dict(cur.fetchone())
+
+
 def get_by_email(email: str) -> Optional[dict]:
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
