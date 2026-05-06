@@ -6,6 +6,9 @@ from datetime import datetime, date
 import psycopg2
 import psycopg2.pool
 import psycopg2.extras
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/cargotone")
 
