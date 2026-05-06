@@ -462,28 +462,48 @@
           </select>
         </div>
         <div class="col-md-4">
-          <label class="form-label form-label-sm fw-semibold">Call Status</label>
-          <input type="text" id="singleCallStatus" class="form-control form-control-sm" placeholder="e.g. Reached">
-        </div>
-        <div class="col-md-4">
           <label class="form-label form-label-sm fw-semibold">Website</label>
           <input type="text" id="singleWebsite" class="form-control form-control-sm" placeholder="https://acme.com">
         </div>
         <div class="col-md-3">
-          <label class="form-label form-label-sm fw-semibold">Air Import Volume</label>
-          <input type="text" id="singleAirImportVolume" class="form-control form-control-sm" placeholder="e.g. 100 kg">
+          <label class="form-label form-label-sm fw-semibold">Air Imports per Month</label>
+          <select id="singleAirImportVolume" class="form-select form-select-sm">
+            <option value="">—</option>
+            <option value="0-5">0-5</option>
+            <option value="6-10">6-10</option>
+            <option value="10-20">10-20</option>
+            <option value=">20">&gt;20</option>
+          </select>
         </div>
         <div class="col-md-3">
-          <label class="form-label form-label-sm fw-semibold">Air Export Volume</label>
-          <input type="text" id="singleAirExportVolume" class="form-control form-control-sm" placeholder="e.g. 100 kg">
+          <label class="form-label form-label-sm fw-semibold">Air Exports per Month</label>
+          <select id="singleAirExportVolume" class="form-select form-select-sm">
+            <option value="">—</option>
+            <option value="0-5">0-5</option>
+            <option value="6-10">6-10</option>
+            <option value="10-20">10-20</option>
+            <option value=">20">&gt;20</option>
+          </select>
         </div>
         <div class="col-md-3">
-          <label class="form-label form-label-sm fw-semibold">Ocean Import Volume</label>
-          <input type="text" id="singleOceanImportVolume" class="form-control form-control-sm" placeholder="e.g. 10 TEU">
+          <label class="form-label form-label-sm fw-semibold">Ocean Imports per Month</label>
+          <select id="singleOceanImportVolume" class="form-select form-select-sm">
+            <option value="">—</option>
+            <option value="0-5">0-5</option>
+            <option value="6-10">6-10</option>
+            <option value="10-20">10-20</option>
+            <option value=">20">&gt;20</option>
+          </select>
         </div>
         <div class="col-md-3">
-          <label class="form-label form-label-sm fw-semibold">Ocean Export Volume</label>
-          <input type="text" id="singleOceanExportVolume" class="form-control form-control-sm" placeholder="e.g. 10 TEU">
+          <label class="form-label form-label-sm fw-semibold">Ocean Exports per Month</label>
+          <select id="singleOceanExportVolume" class="form-select form-select-sm">
+            <option value="">—</option>
+            <option value="0-5">0-5</option>
+            <option value="6-10">6-10</option>
+            <option value="10-20">10-20</option>
+            <option value=">20">&gt;20</option>
+          </select>
         </div>
         <div class="col-12">
           <label class="form-label form-label-sm fw-semibold">Remarks</label>
@@ -612,7 +632,6 @@ async function addSingle() {
     product: g('singleProduct'),
     mode: g('singleMode'),
     shipmentType: g('singleShipmentType'),
-    callStatus: g('singleCallStatus'),
     airImportVolume: g('singleAirImportVolume'),
     airExportVolume: g('singleAirExportVolume'),
     oceanImportVolume: g('singleOceanImportVolume'),
