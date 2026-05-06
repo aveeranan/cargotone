@@ -106,10 +106,6 @@
           <label class="form-label fw-semibold">Status</label>
           <p class="mb-0"><span class="badge-status s-{{ company.status | status_css }}">{{ company.status | status_label }}</span></p>
         </div>
-        <div class="col-md-6">
-          <label class="form-label fw-semibold">Call Status</label>
-          <p class="mb-0">{{ company.callStatus or '—' }}</p>
-        </div>
 
         <div class="col-12"><hr class="my-1"></div>
 
@@ -156,7 +152,7 @@
         <div class="col-12"><hr class="my-1"></div>
 
         <div class="col-md-3">
-          <label class="form-label fw-semibold">Air Import Volume</label>
+          <label class="form-label fw-semibold">Air Imports per Month</label>
           <p class="mb-0">{{ company.airImportVolume or '—' }}</p>
         </div>
         <div class="col-md-3">
@@ -293,10 +289,6 @@
               <option value="{{ s }}" {{ 'selected' if company.status == s else '' }}>{{ s | status_label }}</option>
               {% endfor %}
             </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Call Status</label>
-            <input type="text" id="e-callstatus" class="form-control" value="{{ company.callStatus or '' }}">
           </div>
           <div class="col-md-6">
             <label class="form-label">Website</label>
@@ -625,8 +617,14 @@
           <div class="col-12"><hr class="my-0"></div>
 
           <div class="col-md-3">
-            <label class="form-label">Air Import Volume</label>
-            <input type="text" id="e-airImportVolume" class="form-control" value="{{ company.airImportVolume or '' }}">
+            <label class="form-label">Air Imports per Month</label>
+            <select id="e-airImportVolume" class="form-select">
+              <option value="" {{ 'selected' if not company.airImportVolume else '' }}>—</option>
+              <option value="0-5" {{ 'selected' if company.airImportVolume == '0-5' else '' }}>0-5</option>
+              <option value="6-10" {{ 'selected' if company.airImportVolume == '6-10' else '' }}>6-10</option>
+              <option value="10-20" {{ 'selected' if company.airImportVolume == '10-20' else '' }}>10-20</option>
+              <option value=">20" {{ 'selected' if company.airImportVolume == '>20' else '' }}>&gt;20</option>
+            </select>
           </div>
           <div class="col-md-3">
             <label class="form-label">Air Export Volume</label>
@@ -774,7 +772,6 @@ async function saveCompany() {
   const body = {
     name: g('e-name'),
     status: g('e-status'),
-    callStatus: g('e-callstatus'),
     website: g('e-website'),
     address1: g('e-address1'),
     address2: g('e-address2'),
