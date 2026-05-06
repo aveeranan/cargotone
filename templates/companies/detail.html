@@ -156,15 +156,15 @@
           <p class="mb-0">{{ company.airImportVolume or '—' }}</p>
         </div>
         <div class="col-md-3">
-          <label class="form-label fw-semibold">Air Export Volume</label>
+          <label class="form-label fw-semibold">Air Exports per Month</label>
           <p class="mb-0">{{ company.airExportVolume or '—' }}</p>
         </div>
         <div class="col-md-3">
-          <label class="form-label fw-semibold">Ocean Import Volume</label>
+          <label class="form-label fw-semibold">Ocean Imports per Month</label>
           <p class="mb-0">{{ company.oceanImportVolume or '—' }}</p>
         </div>
         <div class="col-md-3">
-          <label class="form-label fw-semibold">Ocean Export Volume</label>
+          <label class="form-label fw-semibold">Ocean Exports per Month</label>
           <p class="mb-0">{{ company.oceanExportVolume or '—' }}</p>
         </div>
 
@@ -627,16 +627,34 @@
             </select>
           </div>
           <div class="col-md-3">
-            <label class="form-label">Air Export Volume</label>
-            <input type="text" id="e-airExportVolume" class="form-control" value="{{ company.airExportVolume or '' }}">
+            <label class="form-label">Air Exports per Month</label>
+            <select id="e-airExportVolume" class="form-select">
+              <option value="" {{ 'selected' if not company.airExportVolume else '' }}>—</option>
+              <option value="0-5" {{ 'selected' if company.airExportVolume == '0-5' else '' }}>0-5</option>
+              <option value="6-10" {{ 'selected' if company.airExportVolume == '6-10' else '' }}>6-10</option>
+              <option value="10-20" {{ 'selected' if company.airExportVolume == '10-20' else '' }}>10-20</option>
+              <option value=">20" {{ 'selected' if company.airExportVolume == '>20' else '' }}>&gt;20</option>
+            </select>
           </div>
           <div class="col-md-3">
-            <label class="form-label">Ocean Import Volume</label>
-            <input type="text" id="e-oceanImportVolume" class="form-control" value="{{ company.oceanImportVolume or '' }}">
+            <label class="form-label">Ocean Imports per Month</label>
+            <select id="e-oceanImportVolume" class="form-select">
+              <option value="" {{ 'selected' if not company.oceanImportVolume else '' }}>—</option>
+              <option value="0-5" {{ 'selected' if company.oceanImportVolume == '0-5' else '' }}>0-5</option>
+              <option value="6-10" {{ 'selected' if company.oceanImportVolume == '6-10' else '' }}>6-10</option>
+              <option value="10-20" {{ 'selected' if company.oceanImportVolume == '10-20' else '' }}>10-20</option>
+              <option value=">20" {{ 'selected' if company.oceanImportVolume == '>20' else '' }}>&gt;20</option>
+            </select>
           </div>
           <div class="col-md-3">
-            <label class="form-label">Ocean Export Volume</label>
-            <input type="text" id="e-oceanExportVolume" class="form-control" value="{{ company.oceanExportVolume or '' }}">
+            <label class="form-label">Ocean Exports per Month</label>
+            <select id="e-oceanExportVolume" class="form-select">
+              <option value="" {{ 'selected' if not company.oceanExportVolume else '' }}>—</option>
+              <option value="0-5" {{ 'selected' if company.oceanExportVolume == '0-5' else '' }}>0-5</option>
+              <option value="6-10" {{ 'selected' if company.oceanExportVolume == '6-10' else '' }}>6-10</option>
+              <option value="10-20" {{ 'selected' if company.oceanExportVolume == '10-20' else '' }}>10-20</option>
+              <option value=">20" {{ 'selected' if company.oceanExportVolume == '>20' else '' }}>&gt;20</option>
+            </select>
           </div>
 
           {% if user.role == 'admin' %}
