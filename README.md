@@ -188,9 +188,19 @@ cd cargotone
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate      # macOS / Linux
-.venv\Scripts\activate         # Windows
 ```
+
+**macOS / Linux:**
+```bash
+source .venv/bin/activate
+```
+
+**Windows (PowerShell):**
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+> If you get a script execution error on Windows, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` first.
 
 ### 3. Install dependencies
 
@@ -202,8 +212,14 @@ pip install -r requirements.txt
 
 Copy the example and edit as needed:
 
+**macOS / Linux:**
 ```bash
 cp .env.example .env
+```
+
+**Windows (PowerShell):**
+```powershell
+Copy-Item .env.example .env
 ```
 
 `.env` variables:
@@ -250,17 +266,31 @@ createdb cargotone
 
 ### 2. Apply the schema
 
+**macOS / Linux:**
 ```bash
 psql $DATABASE_URL -f storage/schema.sql
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/cargotone"
+psql $env:DATABASE_URL -f storage/schema.sql
 ```
 
 ### 3. Migrate existing JSON data (optional)
 
 If you already have data in the JSON files, run the migration script to load it into PostgreSQL:
 
+**macOS / Linux:**
 ```bash
 DATABASE_URL=postgresql://user:pass@localhost:5432/cargotone \
   python -m storage.migrate_json_to_pg
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:DATABASE_URL = "postgresql://user:pass@localhost:5432/cargotone"
+python -m storage.migrate_json_to_pg
 ```
 
 ### 4. Swap the imports in each router
