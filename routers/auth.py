@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app_templates import templates
 
 import auth as auth_module
-import storage.users as users_store
+import storage.users_db as users_store
 from dependencies import require_auth
 
 router = APIRouter()

@@ -1,6 +1,6 @@
 from fastapi import Request, HTTPException
 import auth
-import storage.users as users_store
+import storage.users_db as users_store
 
 
 def get_current_user(request: Request):
