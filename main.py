@@ -6,7 +6,7 @@ from pathlib import Path
 import uvicorn
 
 import auth as auth_module
-import storage.users as users_store
+import storage.users_db as users_store
 from routers import auth, companies, contacts, calls, agents, reports
 
 app = FastAPI(title="CargoTone CRM", docs_url=None, redoc_url=None)
