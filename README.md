@@ -319,6 +319,59 @@ All function signatures are identical between the JSON and PostgreSQL layers —
 
 ---
 
+## Database Connection Management (PostgreSQL)
+
+### How it works
+
+The app uses a **persistent connection pool** (`ThreadedConnectionPool`) so connections to PostgreSQL are reused across requests rather than opened and closed every time.
+
+| Setting | Value | Meaning |
+|---|---|---|
+| Min connections | 1 | At least 1 connection always open |
+| Max connections | 10 | At most 10 simultaneous connections |
+
+Every SELECT or UPDATE follows this lifecycle:
+
+```
+Request arrives
+  → Borrow a connection from the pool
+  → Run the query
+  → Commit (or rollback on error)
+  → Return the connection to the pool
+Request done
+```
+
+### Keepalive settings
+
+The pool is configured with TCP keepalives so that idle connections are automatically detected and recovered if PostgreSQL restarts:
+
+| Setting | Value | Meaning |
+|---|---|---|
+| `keepalives_idle` | 30s | Send a keepalive probe after 30s of inactivity |
+| `keepalives_interval` | 10s | Retry probe every 10s if no response |
+| `keepalives_count` | 5 | Drop connection after 5 failed probes |
+
+### Things to watch
+
+| Situation | What happens |
+|---|---|
+| More than 10 simultaneous users | 11th request waits or errors — pool exhausted |
+| Long-running request | Holds a connection for its full duration |
+| PostgreSQL restarts | Keepalives detect stale connections and recover automatically |
+| App crashes mid-query | Transaction is automatically rolled back by PostgreSQL |
+
+### Scaling up
+
+If you expect more than 10 concurrent users, increase the pool size in `storage/base_db.py`:
+
+```python
+ThreadedConnectionPool(1, 20, ...)  # increase max from 10 to 20
+```
+
+Also ensure PostgreSQL's `max_connections` (default 100) is set higher than the pool max.
+
+---
+
 ## Company Pipeline Statuses
 
 | Status | Meaning |
